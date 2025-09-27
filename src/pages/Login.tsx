@@ -1,160 +1,413 @@
-import { useState } from "react";
-import { Shield, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Shield, Mail, Lock, Eye, EyeOff, User, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-mining.jpg";
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { signIn, signUp, user, loading } = useAuth();
+  const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("login");
+  const [mines, setMines] = useState<any[]>([]);
   
-  const [formData, setFormData] = useState({
+  const [loginData, setLoginData] = useState({
     email: "",
     password: ""
   });
 
+  const [signupData, setSignupData] = useState({
+    email: "",
+    password: "",
+    firstName: "",
+    lastName: "",
+    phone: "",
+    department: "",
+    position: "",
+    mineId: "",
+    role: "worker" as const
+  });
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user && !loading) {
+      navigate("/");
+    }
+  }, [user, loading, navigate]);
+
+  // Fetch available mines for signup
+  useEffect(() => {
+    const fetchMines = async () => {
+      const { data } = await supabase
+        .from('mines')
+        .select('id, name, location')
+        .eq('status', 'active');
+      
+      if (data) {
+        setMines(data);
+      }
+    };
+    
+    fetchMines();
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate login process
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const { error } = await signIn(loginData.email, loginData.password);
+      
+      if (error) {
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Welcome back!",
+          description: "Successfully logged in to your account.",
+        });
+        navigate("/");
+      }
+    } catch (error) {
       toast({
-        title: "Login Successful",
-        description: "Welcome to RockSafe Prediction System",
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
       });
-      // In a real app, you would handle authentication here
-      window.location.href = "/";
-    }, 1500);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      // First create the user account
+      const { error: signUpError } = await signUp(
+        signupData.email, 
+        signupData.password,
+        {
+          first_name: signupData.firstName,
+          last_name: signupData.lastName,
+          phone: signupData.phone,
+          department: signupData.department,
+          position: signupData.position
+        }
+      );
+      
+      if (signUpError) {
+        toast({
+          title: "Signup Failed",
+          description: signUpError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get the newly created user
+      const { data: { user: newUser } } = await supabase.auth.getUser();
+      
+      if (newUser) {
+        // Create profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: newUser.id,
+            mine_id: signupData.mineId,
+            first_name: signupData.firstName,
+            last_name: signupData.lastName,
+            email: signupData.email,
+            phone: signupData.phone,
+            department: signupData.department,
+            position: signupData.position
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
+
+        // Create user role
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: newUser.id,
+            role: signupData.role,
+            mine_id: signupData.mineId
+          });
+
+        if (roleError) {
+          console.error('Role creation error:', roleError);
+        }
+      }
+
+      toast({
+        title: "Account Created!",
+        description: "Please check your email to verify your account.",
+      });
+      
+      setActiveTab("login");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Shield className="h-12 w-12 mx-auto mb-4 text-primary animate-pulse" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
-      {/* Left side - Hero Image */}
-      <div 
-        className="hidden lg:flex lg:w-1/2 relative"
-        style={{
-          backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url(${heroImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }}
-      >
-        <div className="absolute inset-0 flex items-center justify-center p-12">
-          <div className="text-center text-white">
-            <Shield className="h-16 w-16 mx-auto mb-6 text-primary-glow" />
-            <h1 className="text-4xl font-bold mb-4">RockSafe System</h1>
-            <p className="text-xl mb-6">Advanced Rockfall Prediction & Alert Management</p>
-            <div className="space-y-2 text-left max-w-md">
-              <p className="flex items-center gap-2">
-                ✓ Real-time risk monitoring
-              </p>
-              <p className="flex items-center gap-2">
-                ✓ Geological analysis & mapping
-              </p>
-              <p className="flex items-center gap-2">
-                ✓ Weather integration & forecasting
-              </p>
-              <p className="flex items-center gap-2">
-                ✓ Advanced alert management
-              </p>
-            </div>
+      {/* Left side - Hero image */}
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <img
+          src={heroImage}
+          alt="Mining operation"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+          <div className="text-center text-white p-8">
+            <Shield className="h-16 w-16 mx-auto mb-4" />
+            <h1 className="text-4xl font-bold mb-4">Rockfall Prediction & Alert System</h1>
+            <p className="text-xl opacity-90">
+              Advanced monitoring and safety management for mining operations
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Right side - Login Form */}
+      {/* Right side - Auth forms */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-        <Card className="w-full max-w-md shadow-elegant">
-          <CardHeader className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Shield className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">RockSafe</span>
-            </div>
-            <CardTitle className="text-2xl">Welcome Back</CardTitle>
-            <CardDescription>
-              Sign in to access the Rockfall Prediction System
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your.email@company.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({...prev, email: e.target.value}))}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={formData.password}
-                    onChange={(e) => setFormData(prev => ({...prev, password: e.target.value}))}
-                    className="pl-10 pr-10"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center">
+            <Shield className="h-12 w-12 mx-auto mb-4 text-primary" />
+            <h2 className="text-3xl font-bold">Welcome</h2>
+            <p className="text-muted-foreground mt-2">
+              Access your mining safety dashboard
+            </p>
+          </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <Button variant="link" className="p-0 h-auto text-sm">
-                  Forgot password?
-                </Button>
-              </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="signup">Register</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Login</CardTitle>
+                  <CardDescription>
+                    Enter your credentials to access your account
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="john@company.com"
+                          value={loginData.email}
+                          onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={loginData.password}
+                          onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                          className="pl-10 pr-10"
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-2 top-2 h-6 w-6 p-0"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                variant="hero"
-                disabled={isLoading}
-              >
-                {isLoading ? "Signing in..." : "Sign In"}
-              </Button>
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? "Signing in..." : "Sign In"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              <div className="text-center text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <Button variant="link" className="p-0 h-auto text-sm">
-                  Contact Administrator
-                </Button>
-              </div>
-            </form>
+            <TabsContent value="signup">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create Account</CardTitle>
+                  <CardDescription>
+                    Register for a new mining safety account
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSignup} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="firstName"
+                            placeholder="John"
+                            value={signupData.firstName}
+                            onChange={(e) => setSignupData(prev => ({ ...prev, firstName: e.target.value }))}
+                            className="pl-10"
+                            required
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          placeholder="Smith"
+                          value={signupData.lastName}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, lastName: e.target.value }))}
+                          required
+                        />
+                      </div>
+                    </div>
 
-            {/* Demo Credentials */}
-            <div className="mt-6 p-3 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-2">Demo Credentials:</p>
-              <p className="text-xs">Email: demo@rocksafe.com</p>
-              <p className="text-xs">Password: demo123</p>
-            </div>
-          </CardContent>
-        </Card>
+                    <div className="space-y-2">
+                      <Label htmlFor="signupEmail">Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="signupEmail"
+                          type="email"
+                          placeholder="john@company.com"
+                          value={signupData.email}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, email: e.target.value }))}
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="signupPassword">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="signupPassword"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={signupData.password}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
+                          className="pl-10 pr-10"
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-2 top-2 h-6 w-6 p-0"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mine">Mine</Label>
+                      <div className="relative">
+                        <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                        <Select value={signupData.mineId} onValueChange={(value) => setSignupData(prev => ({ ...prev, mineId: value }))}>
+                          <SelectTrigger className="pl-10">
+                            <SelectValue placeholder="Select your mine" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {mines.map((mine) => (
+                              <SelectItem key={mine.id} value={mine.id}>
+                                {mine.name} - {mine.location}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="department">Department</Label>
+                        <Input
+                          id="department"
+                          placeholder="Safety"
+                          value={signupData.department}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, department: e.target.value }))}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="position">Position</Label>
+                        <Input
+                          id="position"
+                          placeholder="Engineer"
+                          value={signupData.position}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, position: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <Button type="submit" className="w-full" disabled={isLoading || !signupData.mineId}>
+                      {isLoading ? "Creating account..." : "Create Account"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
