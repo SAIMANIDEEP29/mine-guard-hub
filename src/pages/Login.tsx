@@ -48,12 +48,20 @@ export default function Login() {
   // Fetch available mines for signup
   useEffect(() => {
     const fetchMines = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('mines')
         .select('id, name, location')
         .eq('status', 'active');
       
-      if (data) {
+      if (error) {
+        console.error('Error fetching mines:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load mines. Please refresh the page.",
+          variant: "destructive",
+        });
+      } else if (data) {
+        console.log('Loaded mines:', data);
         setMines(data);
       }
     };
@@ -366,9 +374,9 @@ export default function Login() {
                           <SelectTrigger className="pl-10">
                             <SelectValue placeholder="Select your mine" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-background border border-border shadow-lg z-50 max-h-60 overflow-auto">
                             {mines.map((mine) => (
-                              <SelectItem key={mine.id} value={mine.id}>
+                              <SelectItem key={mine.id} value={mine.id} className="cursor-pointer hover:bg-accent">
                                 {mine.name} - {mine.location}
                               </SelectItem>
                             ))}
