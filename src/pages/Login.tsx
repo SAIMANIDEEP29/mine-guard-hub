@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,8 +19,6 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
-  const [mines, setMines] = useState<any[]>([]);
-  
   const [loginData, setLoginData] = useState({
     email: "",
     password: ""
@@ -34,7 +32,8 @@ export default function Login() {
     phone: "",
     department: "",
     position: "",
-    mineId: "",
+    mineName: "",
+    mineLocation: "",
     role: "worker" as const
   });
 
@@ -45,29 +44,6 @@ export default function Login() {
     }
   }, [user, loading, navigate]);
 
-  // Fetch available mines for signup
-  useEffect(() => {
-    const fetchMines = async () => {
-      const { data, error } = await supabase
-        .from('mines')
-        .select('id, name, location')
-        .eq('status', 'active');
-      
-      if (error) {
-        console.error('Error fetching mines:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load mines. Please refresh the page.",
-          variant: "destructive",
-        });
-      } else if (data) {
-        console.log('Loaded mines:', data);
-        setMines(data);
-      }
-    };
-    
-    fetchMines();
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +81,27 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // First create the user account
+      // First create the mine
+      const { data: mineData, error: mineError } = await supabase
+        .from('mines')
+        .insert({
+          name: signupData.mineName,
+          location: signupData.mineLocation,
+          status: 'active'
+        })
+        .select()
+        .single();
+
+      if (mineError || !mineData) {
+        toast({
+          title: "Signup Failed",
+          description: "Failed to create mine. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Then create the user account
       const { error: signUpError } = await signUp(
         signupData.email, 
         signupData.password,
@@ -136,7 +132,7 @@ export default function Login() {
           .from('profiles')
           .insert({
             user_id: newUser.id,
-            mine_id: signupData.mineId,
+            mine_id: mineData.id,
             first_name: signupData.firstName,
             last_name: signupData.lastName,
             email: signupData.email,
@@ -149,13 +145,13 @@ export default function Login() {
           console.error('Profile creation error:', profileError);
         }
 
-        // Create user role
+        // Create user role as mine_admin (since they created the mine)
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({
             user_id: newUser.id,
-            role: signupData.role,
-            mine_id: signupData.mineId
+            role: 'mine_admin',
+            mine_id: mineData.id
           });
 
         if (roleError) {
@@ -165,7 +161,7 @@ export default function Login() {
 
       toast({
         title: "Account Created!",
-        description: "Please check your email to verify your account.",
+        description: "Please check your email to verify your account. You've been assigned as mine administrator.",
       });
       
       setActiveTab("login");
@@ -367,22 +363,29 @@ export default function Login() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="mine">Mine</Label>
+                      <Label htmlFor="mineName">Mine Name</Label>
                       <div className="relative">
-                        <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
-                        <Select value={signupData.mineId} onValueChange={(value) => setSignupData(prev => ({ ...prev, mineId: value }))}>
-                          <SelectTrigger className="pl-10">
-                            <SelectValue placeholder="Select your mine" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-background border border-border shadow-lg z-50 max-h-60 overflow-auto">
-                            {mines.map((mine) => (
-                              <SelectItem key={mine.id} value={mine.id} className="cursor-pointer hover:bg-accent">
-                                {mine.name} - {mine.location}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="mineName"
+                          placeholder="Eagle Mountain Mine"
+                          value={signupData.mineName}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, mineName: e.target.value }))}
+                          className="pl-10"
+                          required
+                        />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mineLocation">Mine Location</Label>
+                      <Input
+                        id="mineLocation"
+                        placeholder="Colorado, USA"
+                        value={signupData.mineLocation}
+                        onChange={(e) => setSignupData(prev => ({ ...prev, mineLocation: e.target.value }))}
+                        required
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -407,7 +410,7 @@ export default function Login() {
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full" disabled={isLoading || !signupData.mineId}>
+                    <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? "Creating account..." : "Create Account"}
                     </Button>
                   </form>
