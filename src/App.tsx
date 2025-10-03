@@ -12,6 +12,11 @@ import Analytics from "./pages/Analytics";
 import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import DataUpload from "./pages/DataUpload";
+import ModelManagement from "./pages/ModelManagement";
+import Explainability from "./pages/Explainability";
+import UserManagement from "./pages/UserManagement";
+import AuditLogs from "./pages/AuditLogs";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +34,11 @@ const App = () => (
             <Route path="risk-map" element={<RiskMap />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="alerts" element={<Alerts />} />
+            <Route path="data-upload" element={<DataUpload />} />
+            <Route path="model-management" element={<ModelManagement />} />
+            <Route path="explainability" element={<Explainability />} />
+            <Route path="user-management" element={<UserManagement />} />
+            <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="settings" element={<Settings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

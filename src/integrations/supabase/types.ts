@@ -423,7 +423,14 @@ export type Database = {
     }
     Enums: {
       alert_type: "rockfall" | "weather" | "equipment" | "blast" | "maintenance"
-      app_role: "super_admin" | "mine_admin" | "planner" | "worker"
+      app_role:
+        | "super_admin"
+        | "mine_admin"
+        | "planner"
+        | "worker"
+        | "master_admin"
+        | "mine_manager"
+        | "employee"
       blast_stage: "before" | "after"
       risk_level: "low" | "medium" | "high" | "critical"
     }
@@ -554,7 +561,15 @@ export const Constants = {
   public: {
     Enums: {
       alert_type: ["rockfall", "weather", "equipment", "blast", "maintenance"],
-      app_role: ["super_admin", "mine_admin", "planner", "worker"],
+      app_role: [
+        "super_admin",
+        "mine_admin",
+        "planner",
+        "worker",
+        "master_admin",
+        "mine_manager",
+        "employee",
+      ],
       blast_stage: ["before", "after"],
       risk_level: ["low", "medium", "high", "critical"],
     },

@@ -10,7 +10,12 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Shield
+  Shield,
+  Upload,
+  Brain,
+  Lightbulb,
+  Users,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +27,11 @@ const navigation = [
   { name: "Risk Map", href: "/risk-map", icon: Map },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Alerts", href: "/alerts", icon: AlertTriangle },
+  { name: "Data Upload", href: "/data-upload", icon: Upload },
+  { name: "AI Models", href: "/model-management", icon: Brain },
+  { name: "Explainability", href: "/explainability", icon: Lightbulb },
+  { name: "Users", href: "/user-management", icon: Users },
+  { name: "Audit Logs", href: "/audit-logs", icon: FileText },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
